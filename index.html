@@ -1,19 +1,21 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <title>Hello, World!</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Senpai - Shortener</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-
 <body>
-  <div>
-    <h1>Url shorter</h1>
-    <input type="url" placeholder="Enter your url" id="myUrl">
-    <button onclick="shortenUrl()">submit</button>
+  <div class="container">
+    <h1>URL Senpai</h1>
+    <div class="input-card">
+      <input type="url" placeholder="https://example.com" id="myUrl" required />
+      <button id="submitBtn" onclick="shortenUrl()">Shorten</button>
+    </div>
     <div id="display"></div>
   </div>
+
   <script src="script.js"></script>
 </body>
-
 </html>
