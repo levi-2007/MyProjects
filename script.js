@@ -7,7 +7,7 @@
             authDomain: "web-chat-app-30ead.firebaseapp.com",
             databaseURL: "https://web-chat-app-30ead-default-rtdb.firebaseio.com/", // <-- Firebase Realtime Database URL ekhane boshabe
             projectId: "web-chat-app-30ead",
-            storageBucket: "web-chat-app-30ead.firebasestorage.app",
+            storageBucket: "web-chat-app-30ead.firebasestorage.appspot.com",
             messagingSenderId: "96758103589",
             appId: "1:96758103589:web:ccc8950b83e7c3987fc9cc"
         };
