@@ -1,87 +1,191 @@
-// তোর Firebase Realtime Database URL
-const FIREBASE_URL = "https://url-shortner-b6d8a-default-rtdb.firebaseio.com/";
 
-// ১. পেজ লোড হলে শর্ট কোড রিডাইরেক্ট হ্যান্ডেল করা (?r=...)
-window.addEventListener("DOMContentLoaded", async () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const code = urlParams.get("r");
+        // ==========================================
+        // 🛠️ FIREBASE CONFIGURATION (YEKHANE URL LAGBE)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBQnoC36eLALqfGlwcjXvaB5cZanQRYFkA",
+            authDomain: "web-chat-app-30ead.firebaseapp.com",
+            databaseURL: "https://web-chat-app-30ead-default-rtdb.firebaseio.com/", // <-- Firebase Realtime Database URL ekhane boshabe
+            projectId: "web-chat-app-30ead",
+            storageBucket: "web-chat-app-30ead.firebasestorage.app",
+            messagingSenderId: "96758103589",
+            appId: "1:96758103589:web:ccc8950b83e7c3987fc9cc"
+        };
 
-  if (code) {
-    document.body.innerHTML = `
-      <div style="text-align: center; margin-top: 60px; font-family: sans-serif; color: #fff;">
-        <h2>Redirecting to destination...</h2>
-        <p>Please wait a moment.</p>
-      </div>
-    `;
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-    try {
-      const response = await fetch(`${FIREBASE_URL}links/${code}.json`);
-      const originalUrl = await response.json();
+        let myUserId = localStorage.getItem('chat_userId');
+        let myName = localStorage.getItem('chat_userName');
+        let currentChatId = null;
+        let currentPartnerId = null;
 
-      if (originalUrl) {
-        window.location.href = originalUrl;
-      } else {
-        document.body.innerHTML = `
-          <div style="text-align: center; margin-top: 60px; font-family: sans-serif; color: #fff;">
-            <h2>404 - Link Not Found</h2>
-            <p>This shortened link does not exist or has expired.</p>
-            <a href="${window.location.origin + window.location.pathname}" style="color: #4da6ff;">Create a new link</a>
-          </div>
-        `;
-      }
-    } catch (err) {
-      document.body.innerHTML = `<h2 style="color: red; text-align: center; margin-top: 60px;">Database Connection Error!</h2>`;
-    }
-  }
-});
+        // Auto login if already saved in LocalStorage
+        window.onload = () => {
+            if (myUserId && myName) {
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainScreen').classList.remove('hidden');
+                document.getElementById('myNameDisplay').innerText = myName;
+                document.getElementById('myIdDisplay').innerText = myUserId;
+                initApp();
+            }
+        };
 
-// ২. শর্ট লিঙ্ক জেনারেট করে ডেটাবেসে সেভ করা
-async function shortenUrl() {
-  const inputUrl = document.getElementById("myUrl");
-  const display = document.getElementById("display");
-  const submitBtn = document.getElementById("submitBtn");
-  const value = inputUrl.value.trim();
+        function loginUser() {
+            const name = document.getElementById('usernameInput').value.trim();
+            if (!name) return alert('Please enter your name!');
 
-  try {
-    new URL(value);
-  } catch (_) {
-    alert("Please enter a valid URL with http:// or https://");
-    return;
-  }
+            myUserId = 'user_' + Math.random().toString(36).substr(2, 9);
+            myName = name;
 
-  submitBtn.disabled = true;
-  submitBtn.innerText = "Creating...";
+            localStorage.setItem('chat_userId', myUserId);
+            localStorage.setItem('chat_userName', myName);
 
-  // ৬ ডিজিটের ইউনিক র‍্যান্ডম স্ট্রিং
-  const uniqueId = Math.random().toString(36).substring(2, 8);
+            // Save user to Firebase Database
+            db.ref('users/' + myUserId).set({
+                name: myName,
+                status: 'online'
+            });
 
-  try {
-    const response = await fetch(`${FIREBASE_URL}links/${uniqueId}.json`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(value),
-    });
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('mainScreen').classList.remove('hidden');
+            document.getElementById('myNameDisplay').innerText = myName;
+            document.getElementById('myIdDisplay').innerText = myUserId;
+            initApp();
+        }
 
-    if (response.ok) {
-      const baseUrl = window.location.origin + window.location.pathname;
-      const shortUrl = `${baseUrl}?r=${uniqueId}`;
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
 
-      display.innerHTML = `
-        <div style="margin-top: 20px; padding: 15px; background: rgba(255,255,255,0.08); border-radius: 8px;">
-          <p style="margin: 0 0 8px 0;">Shortened Link:</p>
-          <a href="${shortUrl}" target="_blank" style="color: #4da6ff; word-break: break-all;">${shortUrl}</a>
-          <br><br>
-          <button onclick="navigator.clipboard.writeText('${shortUrl}'); alert('Copied to clipboard!')">Copy Link</button>
-        </div>
-      `;
-      inputUrl.value = "";
-    } else {
-      alert("Failed to save to Firebase.");
-    }
-  } catch (err) {
-    alert("Error saving link to Firebase database.");
-  } finally {
-    submitBtn.disabled = false;
-    submitBtn.innerText = "Shorten";
-  }
-}
+        function initApp() {
+            loadRequests();
+            loadChats();
+        }
+
+        // Send Chat Request
+        function sendRequest() {
+            const receiverId = document.getElementById('searchIdInput').value.trim();
+            if (!receiverId || receiverId === myUserId) return alert('Enter a valid User ID!');
+
+            db.ref('users/' + receiverId).once('value').then(snapshot => {
+                if (!snapshot.exists()) {
+                    alert('User not found!');
+                    return;
+                }
+
+                const requestId = [myUserId, receiverId].sort().join('_');
+                db.ref('requests/' + requestId).set({
+                    from: myUserId,
+                    fromName: myName,
+                    to: receiverId,
+                    status: 'pending'
+                });
+                alert('Request sent successfully!');
+                document.getElementById('searchIdInput').value = '';
+            });
+        }
+
+        // Load Incoming Requests
+        function loadRequests() {
+            db.ref('requests').on('value', snapshot => {
+                const requestsList = document.getElementById('requestsList');
+                requestsList.innerHTML = '';
+                
+                snapshot.forEach(childSnap => {
+                    const req = childSnap.val();
+                    if (req.to === myUserId && req.status === 'pending') {
+                        requestsList.innerHTML += `
+                            <div class="p-2 flex justify-between items-center text-sm">
+                                <span>${req.fromName}</span>
+                                <button onclick="acceptRequest('${childSnap.key}', '${req.from}', '${req.fromName}')" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">Accept</button>
+                            </div>
+                        `;
+                    }
+                });
+            });
+        }
+
+        function acceptRequest(requestId, partnerId, partnerName) {
+            db.ref('requests/' + requestId).update({ status: 'accepted' });
+            
+            // Create chat room mapping
+            const chatId = [myUserId, partnerId].sort().join('_');
+            db.ref('chats/' + chatId + '/members').set({
+                [myUserId]: myName,
+                [partnerId]: partnerName
+            });
+        }
+
+        // Load Accepted Chats
+        function loadChats() {
+            db.ref('chats').on('value', snapshot => {
+                const chatsList = document.getElementById('chatsList');
+                chatsList.innerHTML = '';
+
+                snapshot.forEach(childSnap => {
+                    const chat = childSnap.val();
+                    if (chat.members && chat.members[myUserId]) {
+                        const partnerId = Object.keys(chat.members).find(id => id !== myUserId);
+                        const partnerName = chat.members[partnerId];
+
+                        chatsList.innerHTML += `
+                            <div onclick="openChat('${childSnap.key}', '${partnerId}', '${partnerName}')" class="p-3 hover:bg-gray-100 cursor-pointer flex items-center justify-between">
+                                <span class="font-medium text-sm text-gray-700">${partnerName}</span>
+                            </div>
+                        `;
+                    }
+                });
+            });
+        }
+
+        // Open Chat Window
+        function openChat(chatId, partnerId, partnerName) {
+            currentChatId = chatId;
+            currentPartnerId = partnerId;
+
+            document.getElementById('noChatSelected').classList.add('hidden');
+            document.getElementById('activeChatContainer').classList.remove('hidden');
+            document.getElementById('chatHeaderName').innerText = partnerName;
+
+            loadMessages();
+        }
+
+        // Load Messages in Real-time
+        function loadMessages() {
+            const msgBox = document.getElementById('messagesBox');
+            db.ref('chats/' + currentChatId + '/messages').on('value', snapshot => {
+                msgBox.innerHTML = '';
+                snapshot.forEach(childSnap => {
+                    const msg = childSnap.val();
+                    const isMe = msg.sender === myUserId;
+                    msgBox.innerHTML += `
+                        <div class="flex ${isMe ? 'justify-end' : 'justify-start'}">
+                            <div class="max-w-xs px-4 py-2 rounded-lg text-sm ${isMe ? 'bg-blue-600 text-white' : 'bg-white text-gray-800 border'}">
+                                ${msg.text}
+                            </div>
+                        </div>
+                    `;
+                });
+                msgBox.scrollTop = msgBox.scrollHeight;
+            });
+        }
+
+        function sendMessage() {
+            const text = document.getElementById('messageInput').value.trim();
+            if (!text || !currentChatId) return;
+
+            db.ref('chats/' + currentChatId + '/messages').push({
+                sender: myUserId,
+                text: text,
+                timestamp: Date.now()
+            });
+
+            document.getElementById('messageInput').value = '';
+        }
+
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') sendMessage();
+        }
